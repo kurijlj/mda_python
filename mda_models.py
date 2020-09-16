@@ -487,19 +487,19 @@ class Graph():
             ]
 
         window = None
-        if win_type == 'flat':  # moving average
-            window = np.ones(win_len, 'd')
-        elif win_type == 'hanning':
+        if win_type == 'hanning':
             window = np.hanning(win_len)
         elif win_type == 'hamming':
             window = np.hamming(win_len)
         elif win_type == 'bartlett':
             window = np.bartlett(win_len)
-        else:  # It must be 'blackman'.
+        elif win_type == 'blackman':
             window = np.blackman(win_len)
+        else:  # Default is the moving average.
+            window = np.ones(win_len, 'd')
 
         result = np.convolve(window / window.sum(), reflected, mode='valid')
 
         # Because len(output) != len(input) we don't simply return result,
         # but a ...
-        return result[(win_len/2-1):-(win_len/2)]
+        return result[int((win_len/2)-1):-int(win_len/2)]

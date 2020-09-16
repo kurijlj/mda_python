@@ -50,7 +50,8 @@
 # Modules import section
 # =============================================================================
 
-from matplotlib import use
+from enum import Enum  # Required by Message class.
+from matplotlib import use  # Required by use in line 63
 from matplotlib.backends.backend_tkagg import (
         FigureCanvasTkAgg,
         NavigationToolbar2Tk
@@ -62,9 +63,32 @@ import matplotlib.pyplot as plt
 use("TkAgg")
 plt.style.use('bmh')
 
+
 # =============================================================================
 # Utility classes and functions
 # =============================================================================
+
+class Message(Enum):
+    """An utility class to enumarate messages that can be exchanged between GUI
+    elements via mediator (controller) object.
+    """
+
+    updtview = 0  # Update view.
+    smchngd = 1   # Graph smoothing options have changed.
+
+def checktype(tpe, var, vardsc):
+    """Utility routine used to check if given variable (var) is of requested
+    type (tp). If not it raises TypeError exception with a appropriate message.
+    Variable description (vardsc) is used for formatting more descriptive error
+    messages on rising exception.
+    """
+
+    if var is not None and type(var) is not tpe:
+        raise TypeError('{0} must be {1} or NoneType, not {2}'.format(
+            vardsc,
+            tpe.__name__,
+            type(var).__name__
+        ))
 
 
 # =============================================================================
@@ -83,7 +107,6 @@ class PlotNavigationToolbar(NavigationToolbar2Tk):
         """ TODO: Put method docstring HERE.
         """
 
-        self._set_cursor(event)
         # We don't want any position message in the toolbar.
         self.set_message('')
 
@@ -100,6 +123,14 @@ class PlotView(tki.Frame):
         else:
             # No reference to controller object.
             self._controller = None
+
+        # Graph's line width value (linewidth) must be passed as
+        # key-word agrument.
+        if 'linewidth' in kwargs:
+            self._linewidth = kwargs.pop('linewidth')
+        else:
+            # Set default line thickness for the plot.
+            self._linewidth = 0.5
 
         # Pass the rest of initialization to the superclass.
         tki.Frame.__init__(self, *args, **kwargs)
@@ -132,7 +163,7 @@ class PlotView(tki.Frame):
             model = self._controller.data_model
         return model
 
-    def _update(self):
+    def _update(self, smoothing=None):
         """ TODO: Put method docstring HERE.
         """
 
@@ -145,18 +176,119 @@ class PlotView(tki.Frame):
             self._axes.plot(
                 model.data[:, 1],
                 '-',
-                linewidth=0.5,
-                color='green'
+                linewidth=self._linewidth,
                 )
+            self._axes.plot(
+                model.scaled_window_smoothed(
+                    model.data[:, 1],
+                    win_type='flat',
+                    win_len=20),
+                '-',
+                linewidth=self._linewidth,
+                )
+
+            # if smoothing is not None:
+            #     checktype(dict, smoothing, 'Smoothing dictionary')
+            #     for mode in smoothing:
+            #         if smoothing[mode]:
+            #             self._axes.plot(
+            #                 model.scaled_window_smoothed(
+            #                     model.data[:, 1],
+            #                     win_type=mode
+            #                     ),
+            #                 '-',
+            #                 linewidth=self._linewidth,
+            #                 )
 
         # Update superclass.
         tki.Tk.update(self)
 
-    def update(self):
+    def update(self, smoothing=None):
         """ TODO: Put method docstring HERE.
         """
 
-        self._update()
+        self._update(smoothing)
+
+
+class AppControlsView(tki.Frame):
+    """ Custom widget class for displaying and taking input from user
+    controlls (e.g. radiobuttonsw, etc.).
+    """
+
+    def __init__(self, *args, **kwargs):
+
+        # Reference to a controller object must be passed as key-word agrument.
+        # Controller object's class must implement dispatch method takeing
+        # following arguments dispatch(sender, message, **kwargs).
+        if 'controller' in kwargs:
+            self.controller = kwargs.pop('controller')
+            if not self.controller or not hasattr(self.controller, 'dispatch'):
+                raise TypeError(
+                        'Dispatch method not implemented by'
+                        ' object\'s class ({0}).'
+                        .format(type(self.controller))
+                    )
+        else:
+            # No reference to controller object.
+            self.controller = None
+
+        # Reference to the root widget must be passed as key-word agrument.
+        if 'mainwindow' in kwargs:
+            self._mainwindow = kwargs.pop('mainwindow')
+        else:
+            # No reference to the root widget.
+            self._mainwindow = None
+
+        # Pass the rest of initialization to the superclass.
+        tki.Frame.__init__(self, *args, **kwargs)
+
+        # Set label frame to distinct control panel from the rest of the GUI.
+        labelframe = ttk.LabelFrame(self, text='Control Panel')
+        labelframe.pack(side=tki.RIGHT, fill=tki.Y, padx=5, pady=5)
+
+        # Split control view into upper and lower half. Upper one is to hold
+        # actual display controls, while lower one holds 'Quit' button only.
+        top_frame = ttk.Frame(labelframe)
+        top_frame.pack(side=tki.TOP, fill=tki.X, padx=5, pady=5)
+        spacer = ttk.Frame(labelframe)
+        spacer.pack(side=tki.TOP, fill=tki.Y, expand=True)
+        bottom_frame = ttk.Frame(labelframe)
+        bottom_frame.pack(side=tki.BOTTOM, fill=tki.X, padx=5, pady=5)
+
+        # Set smoothing controls. First set dictionary to keep track of
+        # user selected smoothing options for the plotted data.
+        smth_modes = ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']
+        self._smoothing = dict()
+        for mode in smth_modes:
+            self._smoothing[mode] = tki.BooleanVar()
+            ttk.Checkbutton(
+                    top_frame,
+                    text=mode,
+                    # command=getattr(self, '_toggle_smth_' + mode),
+                    command=self._toggle_smth_mode,
+                    variable=self._smoothing[mode]
+                ).pack(side=tki.TOP, fill=tki.X)
+            self._smoothing[mode].set(0)
+
+        # Set appllication "Quit" button.
+        destroycmd = None
+        if self._mainwindow and hasattr(self._mainwindow, 'destroy'):
+            destroycmd = self._mainwindow.destroy
+
+        ttk.Button(bottom_frame, text='Quit', command=destroycmd)\
+            .pack(side=tki.TOP, fill=tki.X)
+
+    def _toggle_smth_mode(self):
+        """Method to be called when one of smoothing radio buttons is
+        checked. It invokes actual method that turns mode display on/off.
+        """
+
+        if hasattr(self.master, 'dispatch'):
+            self.controller.dispatch(
+                self,
+                Message.smchngd,
+                smoothing=self._smoothing
+                )
 
 
 class TkiAppMainWindow(tki.Tk):
@@ -188,7 +320,13 @@ class TkiAppMainWindow(tki.Tk):
                 )
 
         # Pack top container widget.
-        main_panel_frame.pack(side=tki.TOP, fill=tki.X, padx=2, pady=2)
+        main_panel_frame.pack(
+            side=tki.LEFT,
+            fill=tki.BOTH,
+            expand=True,
+            padx=2,
+            pady=2
+            )
 
         # ======================================================================
         # Place your widgets here.
@@ -198,21 +336,44 @@ class TkiAppMainWindow(tki.Tk):
             main_panel_frame,
             controller=self._controller
             )
-        self._plot_view.pack(side=tki.TOP, fill=tki.X)
+        self._plot_view.pack(side=tki.TOP, fill=tki.BOTH, expand=True)
 
         # ======================================================================
 
         # Set up some space between test widgets and control widgets.
-        ttk.Frame(main_panel_frame).pack(side=tki.TOP, fill=tki.Y, expand=True)
+        ttk.Frame(main_panel_frame).pack(
+            side=tki.LEFT,
+            fill=tki.Y,
+            pady=4
+            )
 
         # Set up control widgets and pack.
-        ttk.Button(main_panel_frame, text='Quit', command=self.destroy)\
-            .pack(side=tki.BOTTOM, fill=tki.X, padx=1, pady=1)
+        self._controlpanel = AppControlsView(
+                self,
+                controller=self,
+                mainwindow=self
+            )
+        self._controlpanel.pack(side=tki.RIGHT, fill=tki.Y)
 
     def _update(self):
         """Method to update display of main window.
         """
         self._plot_view.update()
+
+    def dispatch(self, sender, event, **kwargs):
+        """A method to mediate messages between GUI objects and GUI objects
+        and the controller.
+        """
+
+        # So far we send all messages to the controller.
+        # self.controller.dispatch(sender, event, **kwargs)
+        if event == Message.smchngd:
+            if 'smoothing' in kwargs:
+                self._plot_view.update(kwargs['smoothing'])
+
+            else:
+                print('{0}: \'smoothing\' parameter is missing.'
+                      .format(self._programName))
 
     def update(self):
         """TODO: Put method docstring HERE.
