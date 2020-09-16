@@ -141,7 +141,7 @@ class DefaultAction(ProgramAction):
         self._delimiter = delimiter
 
         # Define all models.
-        self.user_model = None
+        self.data_model = None
 
         # Initialize views.
         self._mainscreen = mdav.TkiAppMainWindow(controller=self)
@@ -183,7 +183,7 @@ class DefaultAction(ProgramAction):
             print('{0}: Starting GUI ...'.format(self._program_name))
 
             # Initialize all models.
-            self.user_model = mdam.User(un='root')  # Create root user.
+            self.data_model = mdam.Graph(data, headers)
 
             # We have all neccessary files. Start the GUI.
             self._mainscreen.title(self._program_name)

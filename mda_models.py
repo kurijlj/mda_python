@@ -98,16 +98,6 @@ ReadError = ReadErrorType(
     ROW_WIDTH_TOO_BIG='Row width too big'
     )
 
-class ReadErrorO():
-    """TODO: Put class docstring HERE.
-    """
-
-    EMPTY_FILE = 'Empty file'
-    NO_DATA = 'No table data could be found'
-    TOO_MANY_COLUMNS = 'Too many data columns'
-    ROW_WIDTH_TOO_SMALL = 'Row width too small'
-    ROW_WIDTH_TOO_BIG = 'Row width too big'
-
 
 class CSVDataReader():
     """TODO: Put class docstring HERE.
@@ -413,79 +403,103 @@ def print_to_stdout(data, headers=None):
 # Model classes
 # =============================================================================
 
-class User():
-    """ A demo class representing user with general data about user.
+class Graph():
+    """TODO: Put class docstring HERE.
     """
 
-    def __init__(self, un='user', psswd='p4s5w0rd', fn=None, ln=None):
-        self._user_name = un
-        self._password = psswd
-        self._first_name = fn
-        self._last_name = ln
-
-    def __repr__(self):
-        str_type = type(self).__name__
-        str_un = 'Username: {0}'.format(self._user_name)
-        str_psswd = 'Password: {0}'.format(self._password)
-
-        if self._first_name:
-            str_fn = 'First Name: {0}'.format(self._first_name)
-        else:
-            str_fn = 'First Name: N/A'
-
-        if self._last_name:
-            str_ln = 'Last Name: {0}'.format(self._last_name)
-        else:
-            str_ln = 'Last Name: N/A'
-
-        return str_type + '(\n' + str_un + ',\n' + str_psswd + ',\n' +\
-            str_fn + ',\n' + str_ln + '\n)'
-
-    def change_password(self, password):
-        """TODO: Put method docstring HERE.
-        """
-
-        _checktype(str, password, 'Password')
-        self._password = password
-
-    def change_first_name(self, first_name):
-        """TODO: Put method docstring HERE.
-        """
-
-        _checktype(str, first_name, 'First name')
-        self._first_name = first_name
-
-    def change_lastname(self, last_name):
-        """TODO: Put method docstring HERE.
-        """
-
-        _checktype(str, last_name, 'Last name')
-        self._last_name = last_name
+    def __init__(self, data, headers):
+        self._data = dict()
+        self._data['headers'] = headers
+        self._data['raw'] = data
 
     @property
-    def username(self):
+    def headers(self):
         """TODO: Put method docstring HERE.
         """
 
-        return self._user_name
+        # TODO: Generate headers if None.
+        return self._data['headers']
 
     @property
-    def password(self):
+    def data(self):
         """TODO: Put method docstring HERE.
         """
 
-        return self._password
+        return self._data['raw']
 
-    @property
-    def firstname(self):
-        """TODO: Put method docstring HERE.
+    def scaled_window_smoothed(
+            self,
+            data_array,
+            win_type='hanning',
+            win_len=11
+            ):
+        """Smooth the data using a window with requested size.
+
+        This method is based on the convolution of a scaled window with the
+        signal (data array). The signal is prepared by introducing reflected
+        copies of the signal (with the window size) in both ends so that
+        transient parts are minimized in the begining and end part of the
+        output array.
+
+        Input:
+            data_array: 1D numpy array storing data to be smoothed.
+
+            win_type:   The type of window. Can have one of the following
+                        values:
+                            'flat',
+                            'hanning',
+                            'hamming',
+                            'bartlett',
+                            'blackman'.
+
+                        Flat window will produce a moving average smoothing.
+
+            win_len:    The length of the smoothing window. Should be an
+                        odd integer.
+
+        Result:
+            The smoothed 1D data array.
+
+        Notes:
+            * Input data data array needs to be bigger than window
+              size (win_len).
         """
 
-        return self._first_name
+        if data_array.size < win_len:
+            raise ValueError(
+                'Input vector needs to be bigger than window size.'
+                )
 
-    @property
-    def lastname(self):
-        """TODO: Put method docstring HERE.
-        """
+        if win_len < 3:
+            return data_array
 
-        return self._last_name
+        win_types = ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']
+        if win_type not in win_types:
+            raise ValueError(
+                'Scaled window type must be one of "flat", "hanning", \
+                "hamming", "bartlett", "blackman"'
+                )
+
+        reflected = np.r_[
+            data_array[win_len-1:0:-1],
+            data_array,
+            data_array[-2:-win_len-1:-1]
+            ]
+
+        window = None
+        if win_type == 'flat':  # moving average
+            window = np.ones(win_len, 'd')
+        elif win_type == 'hanning':
+            window = np.hanning(win_len)
+        elif win_type == 'hamming':
+            window = np.hamming(win_len)
+        elif win_type == 'bartlett':
+            window = np.bartlett(win_len)
+        else:  # It must be 'blackman'.
+            window = np.blackman(win_len)
+
+        result = np.convolve(window / window.sum(), reflected, mode='valid')
+
+        # Because len(output) != len(input) we don't simply return result,
+        # but a ...
+        return result[(win_len/2-1):-(win_len/2)]

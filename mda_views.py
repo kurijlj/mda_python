@@ -50,9 +50,17 @@
 # Modules import section
 # =============================================================================
 
+from matplotlib import use
+from matplotlib.backends.backend_tkagg import (
+        FigureCanvasTkAgg,
+        NavigationToolbar2Tk
+    )
 import tkinter as tki
 import tkinter.ttk as ttk
+import matplotlib.pyplot as plt
 
+use("TkAgg")
+plt.style.use('bmh')
 
 # =============================================================================
 # Utility classes and functions
@@ -63,8 +71,25 @@ import tkinter.ttk as ttk
 # View classes
 # =============================================================================
 
-class UserView(tki.Frame):
-    """ A demo class representing Tk widget to view user data.
+class PlotNavigationToolbar(NavigationToolbar2Tk):
+    """ TODO: Put class docstring HERE.
+    """
+
+    def __init__(self, canvas, window):
+        # Pass initialization to the superclass.
+        super().__init__(canvas, window)
+
+    def mouse_move(self, event):
+        """ TODO: Put method docstring HERE.
+        """
+
+        self._set_cursor(event)
+        # We don't want any position message in the toolbar.
+        self.set_message('')
+
+
+class PlotView(tki.Frame):
+    """ Custom widget base class for displaying matlplotlib plot.
     """
 
     def __init__(self, *args, **kwargs):
@@ -76,41 +101,62 @@ class UserView(tki.Frame):
             # No reference to controller object.
             self._controller = None
 
-        # Pass initialization to superclass.
+        # Pass the rest of initialization to the superclass.
         tki.Frame.__init__(self, *args, **kwargs)
 
-        self._view_username = tki.Label(self, text='Username', anchor='w')
-        self._view_username.pack(side=tki.TOP, fill=tki.X)
-        self._view_password = tki.Label(self, text='Password', anchor='w')
-        self._view_password.pack(side=tki.TOP, fill=tki.X)
-        self._view_firstname = tki.Label(self, text='First name', anchor='w')
-        self._view_firstname.pack(side=tki.TOP, fill=tki.X)
-        self._view_lastname = tki.Label(self, text='Last name', anchor='w')
-        self._view_lastname.pack(side=tki.TOP, fill=tki.X)
+        # Initialize the figure.
+        self._figure = plt.Figure()
+        FigureCanvasTkAgg(self._figure, self)
+        self._figure.canvas.get_tk_widget().pack(fill=tki.BOTH, expand=True)
+        self._figure.canvas.draw()
+
+        # Initialize axes.
+        self._axes = self._figure.add_subplot(111)
+
+        # Add toolbar so user can zoom, take screenshots, etc.
+        self._toolbar = PlotNavigationToolbar(
+                self._figure.canvas,
+                self,
+            )
+        self._toolbar.pack_propagate(0)
+
+        # Update toolbar display.
+        self._toolbar.update()
 
     def model(self):
+        """TODO: Put method docstring HERE.
+        """
+
         model = None
-        if self._controller and hasattr(self._controller, 'user_model'):
-            model = self._controller.user_model
+        if self._controller and hasattr(self._controller, 'data_model'):
+            model = self._controller.data_model
         return model
 
     def _update(self):
+        """ TODO: Put method docstring HERE.
+        """
+
         model = self.model()
-        if model:
-            self._view_username['text'] = model.username
-            self._view_password['text'] = model.password
-            if model.firstname:
-                self._view_firstname['text'] = model.firstname
-            else:
-                self._view_firstname['text'] = 'N/A'
-            if model.lastname:
-                self._view_lastname['text'] = model.lastname
-            else:
-                self._view_lastname['text'] = 'N/A'
+
+        # First clear axes.
+        self._axes.clear()
+
+        if model is not None:
+            self._axes.plot(
+                model.data[:, 1],
+                '-',
+                linewidth=0.5,
+                color='green'
+                )
+
+        # Update superclass.
+        tki.Tk.update(self)
 
     def update(self):
+        """ TODO: Put method docstring HERE.
+        """
+
         self._update()
-        tki.Frame.update(self)
 
 
 class TkiAppMainWindow(tki.Tk):
@@ -148,11 +194,11 @@ class TkiAppMainWindow(tki.Tk):
         # Place your widgets here.
         # ======================================================================
 
-        self._userview = UserView(
+        self._plot_view = PlotView(
             main_panel_frame,
             controller=self._controller
             )
-        self._userview.pack(side=tki.TOP, fill=tki.X)
+        self._plot_view.pack(side=tki.TOP, fill=tki.X)
 
         # ======================================================================
 
@@ -166,8 +212,11 @@ class TkiAppMainWindow(tki.Tk):
     def _update(self):
         """Method to update display of main window.
         """
-        self._userview.update()
+        self._plot_view.update()
 
     def update(self):
+        """TODO: Put method docstring HERE.
+        """
+
         self._update()
         tki.Tk.update(self)
