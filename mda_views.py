@@ -32,7 +32,7 @@
 
 # ============================================================================
 #
-# TODO:
+# TODO: Implement named tuple for passing smoothing options preview.
 #
 #
 # ============================================================================
@@ -154,6 +154,19 @@ class PlotView(tki.Frame):
         # Update toolbar display.
         self._toolbar.update()
 
+        # Initialize smoothing options preview.
+        smth_modes = ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']
+        self._smth_prvu = dict()
+        for mode in smth_modes:
+            self._smth_prvu[mode] = False
+
+    def change_smoothing_preview(self, options):
+        """TODO: Put method docstring HERE.
+        """
+
+        self._smth_prvu = options
+        self._update()
+
     def model(self):
         """TODO: Put method docstring HERE.
         """
@@ -163,7 +176,7 @@ class PlotView(tki.Frame):
             model = self._controller.data_model
         return model
 
-    def _update(self, smoothing=None):
+    def _update(self):
         """ TODO: Put method docstring HERE.
         """
 
@@ -177,37 +190,35 @@ class PlotView(tki.Frame):
                 model.data[:, 1],
                 '-',
                 linewidth=self._linewidth,
-                )
-            self._axes.plot(
-                model.scaled_window_smoothed(
-                    model.data[:, 1],
-                    win_type='flat',
-                    win_len=20),
-                '-',
-                linewidth=self._linewidth,
+                label='Measured Data',
                 )
 
-            # if smoothing is not None:
-            #     checktype(dict, smoothing, 'Smoothing dictionary')
-            #     for mode in smoothing:
-            #         if smoothing[mode]:
-            #             self._axes.plot(
-            #                 model.scaled_window_smoothed(
-            #                     model.data[:, 1],
-            #                     win_type=mode
-            #                     ),
-            #                 '-',
-            #                 linewidth=self._linewidth,
-            #                 )
+            for mode in self._smth_prvu:
+                if self._smth_prvu[mode]:
+                    self._axes.plot(
+                        model.scaled_window_smoothed(
+                            model.data[:, 1],
+                            win_type=mode
+                            ),
+                        '-',
+                        linewidth=self._linewidth,
+                        label=mode.capitalize()
+                        )
+            self._axes.set_xlabel(model.headers[0])
+            self._axes.set_ylabel(model.headers[1])
+            self._axes.set_title(model.title)
+            self._axes.legend()
+
+        self._figure.canvas.draw()
 
         # Update superclass.
         tki.Tk.update(self)
 
-    def update(self, smoothing=None):
+    def update(self):
         """ TODO: Put method docstring HERE.
         """
 
-        self._update(smoothing)
+        self._update()
 
 
 class AppControlsView(tki.Frame):
@@ -263,8 +274,7 @@ class AppControlsView(tki.Frame):
             self._smoothing[mode] = tki.BooleanVar()
             ttk.Checkbutton(
                     top_frame,
-                    text=mode,
-                    # command=getattr(self, '_toggle_smth_' + mode),
+                    text=mode.capitalize(),
                     command=self._toggle_smth_mode,
                     variable=self._smoothing[mode]
                 ).pack(side=tki.TOP, fill=tki.X)
@@ -369,7 +379,10 @@ class TkiAppMainWindow(tki.Tk):
         # self.controller.dispatch(sender, event, **kwargs)
         if event == Message.smchngd:
             if 'smoothing' in kwargs:
-                self._plot_view.update(kwargs['smoothing'])
+                options = dict()
+                for mode in kwargs['smoothing']:
+                    options[mode] = kwargs['smoothing'][mode].get()
+                self._plot_view.change_smoothing_preview(options)
 
             else:
                 print('{0}: \'smoothing\' parameter is missing.'

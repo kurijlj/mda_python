@@ -50,7 +50,10 @@
 # Modules import section
 # =============================================================================
 
-from os.path import isfile  # Test for existance of a file.
+from os.path import (
+    isfile,    # Test for existance of a file.
+    basename,  # Returns filename from a path.
+    )
 import mda_models as mdam
 import mda_views as mdav
 
@@ -183,7 +186,11 @@ class DefaultAction(ProgramAction):
             print('{0}: Starting GUI ...'.format(self._program_name))
 
             # Initialize all models.
-            self.data_model = mdam.Graph(data, headers)
+            self.data_model = mdam.Graph(
+                data,
+                headers,
+                basename(self._data_file)
+                )
 
             # We have all neccessary files. Start the GUI.
             self._mainscreen.title(self._program_name)

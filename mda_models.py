@@ -103,8 +103,12 @@ class CSVDataReader():
     """TODO: Put class docstring HERE.
     """
 
-    def __init__(self, max_col_count=26):
-        # Set maximum allowed column count per dataset to 26.
+    def __init__(self, max_col_count=2):
+        # Set maximum allowed column count per dataset to 2. Usually we allow
+        # up to 26 columns (same as the number of letters in the modern English
+        # alfabet), but since our GUI currently supports displaying and
+        # analysis of only one set of measured data we restrict this number
+        # to 2 here.
         self.max_col_count = max_col_count
 
         # Initialize attributes.
@@ -407,18 +411,26 @@ class Graph():
     """TODO: Put class docstring HERE.
     """
 
-    def __init__(self, data, headers):
+    def __init__(self, data, headers, title):
         self._data = dict()
         self._data['headers'] = headers
         self._data['raw'] = data
+        self._data['title'] = title
 
     @property
     def headers(self):
         """TODO: Put method docstring HERE.
         """
 
-        # TODO: Generate headers if None.
-        return self._data['headers']
+        result = None
+
+        # Generate headers if None.
+        if not self._data['headers']:
+            result = ('X', 'Y')
+        else:
+            result = tuple(self._data['headers'])
+
+        return result
 
     @property
     def data(self):
@@ -426,6 +438,13 @@ class Graph():
         """
 
         return self._data['raw']
+
+    @property
+    def title(self):
+        """TODO: Put method docstring HERE.
+        """
+
+        return self._data['title']
 
     def scaled_window_smoothed(
             self,
@@ -502,4 +521,4 @@ class Graph():
 
         # Because len(output) != len(input) we don't simply return result,
         # but a ...
-        return result[int((win_len/2)-1):-int(win_len/2)]
+        return result[int(win_len/2):-int((win_len/2)+1)]
